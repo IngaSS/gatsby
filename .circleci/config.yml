@@ -28,10 +28,17 @@ jobs:
       - run:
           command: yarn bootstrap -- concurrency=<< parameters.concurrency >> --stream
           name: Build monorepo
+      - run:
+          command: |
+            yarn global add verdaccio
+            echo 'export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"' >> $BASH_ENV
+          name: Add verdaccio
+      - run:
+          command: node scripts/circleci-local-publish/index.js << pipeline.number >>
+          name: Publish monorepo
       - persist_to_workspace:
           paths:
             - packages/
-            - node_modules
           root: ./
   lint:
     executor: node
@@ -100,7 +107,7 @@ jobs:
           paths:
             - ./.yarn/yarn-offline-cache/
       - run:
-          command: yarn jest --ci --runInBand ((yarn jest --listTests) | Foreach-Object {$_ -replace '.*\\packages', 'packages'} | circleci tests split --split-by=timings)
+          command: yarn jest --ci --runInBand ((yarn jest --listTests) | Foreach-Object {$_ -replace '.*\\packages', 'packages'} | Foreach-Object {$_ -replace '\', '/'} | circleci tests split --split-by=timings)
           environment:
             GENERATE_JEST_REPORT: true
             JEST_JUNIT_OUTPUT_DIR: ./test-results/jest-node/
@@ -231,7 +238,7 @@ orbs:
                         echo "Running override package installation command:"
                         << parameters.override-ci-command >>
                       else
-                        yarn install --frozen-lockfile --prefer-offline --link-duplicates --verbose
+                        yarn install --frozen-lockfile --prefer-offline --link-duplicates
                       fi
                     name: Installing YARN packages
                     working_directory: <<parameters.app-dir>>
